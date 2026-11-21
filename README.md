@@ -2,7 +2,7 @@
 
 Distribución no oficial para Windows de [PyMININEC](https://github.com/schlatterbeck/pymininec), implementación de MININEC3 en Python de **Dr. Ralf Schlatterbeck**. Esta distribución añade un ejecutable de consola para simplificar su uso; **no** es MMANA-GAL ni modifica las ecuaciones del motor original.
 
-## 5. Descargar y ejecutar
+## 1. Descargar y ejecutar
 
 1. Abre [Actions](https://github.com/sergiozxp/mininec-windows/actions) y selecciona una ejecución exitosa de **Build MININEC for Windows**.
 2. En **Artifacts**, descarga `mininec-windows-win64`, descomprímelo y extrae `mininec.exe`.
@@ -17,7 +17,7 @@ El EXE es un **programa de consola**: normalmente recibe los datos como **opcion
 
 > Este procedimiento queda sujeto al éxito de la compilación automática. Que el repositorio exista no significa que el EXE esté ya validado.
 
-## 6. Estructura básica de entrada
+## 2. Estructura básica de entrada
 
 ```text
 mininec.exe -f FRECUENCIA -w DEFINICION_DE_HILO --excitation-pulse=PULSO [OTRAS_OPCIONES]
@@ -51,7 +51,7 @@ La sintaxis de cada hilo es:
 
 Usa punto decimal (`0.001`), no coma decimal: las comas separan valores.
 
-## 7. Ejemplo completo: dipolo horizontal de 10 m
+## 3. Ejemplo completo: dipolo horizontal de 10 m
 
 Modelo didáctico: un hilo recto de 10 m de longitud, sobre el eje X, con coordenada Z=6 m y radio de 1 mm, discretizado en 21 segmentos. Se alimenta aproximadamente en el centro.
 
