@@ -1,0 +1,8 @@
+# Dipolo horizontal, 10 m de longitud, z=6 m, suelo real
+# Unidades: MHz, m, S/m. Los decimales usan punto.
+FREQ 14.2
+WIRE 1 21 -5 0 6 5 0 6 0.001
+EXCITATION 10
+GROUND 13 0.005 0
+THETA 0 5 37
+PHI 0 5 73
