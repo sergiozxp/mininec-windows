@@ -2,6 +2,16 @@
 
 Distribución no oficial para Windows de [PyMININEC](https://github.com/schlatterbeck/pymininec), implementación de MININEC3 en Python de **Dr. Ralf Schlatterbeck**. Esta distribución añade un ejecutable de consola para simplificar su uso; **no** es MMANA-GAL ni modifica las ecuaciones del motor original.
 
+## Banco de validación NEC2–MININEC
+
+Se incluyó un banco reproducible de **tres casos**: dipolo en espacio libre (14,2 MHz), dipolo a 6 m sobre suelo real (14,2 MHz) y vertical de 10 m con cuatro radiales elevados (7,1 MHz). Incluye generador de entradas para ambos motores, parser inicial de impedancias, salida CSV y pruebas automatizadas.
+
+- [Guía de operación del banco](bench/README.md)
+- [Código del ejecutor](bench/run_bench.py)
+- [Ejecutar/comprobar comparación NEC2–MININEC en GitHub Actions](https://github.com/sergiozxp/mininec-windows/actions/workflows/engine-comparison.yml)
+
+**Estado:** las pruebas sin motores ya han pasado. La comparación con ambos motores se ejecuta separadamente y sus números solo son utilizables tras comprobar logs y salidas originales. No se han implementado todavía métricas comparables de patrones ni ganancia. La vertical es provisional por la diferencia de formulación del punto de alimentación y la unión de radiales.
+
 ## 1. Descargar y ejecutar
 
 1. Abre [Actions](https://github.com/sergiozxp/mininec-windows/actions) y selecciona una ejecución exitosa de **Build MININEC for Windows**.
