@@ -12,6 +12,47 @@ Se incluyó un banco reproducible de **tres casos**: dipolo en espacio libre (14
 
 **Estado:** las pruebas sin motores ya han pasado. La comparación con ambos motores se ejecuta separadamente y sus números solo son utilizables tras comprobar logs y salidas originales. No se han implementado todavía métricas comparables de patrones ni ganancia. La vertical es provisional por la diferencia de formulación del punto de alimentación y la unión de radiales.
 
+## Entrada mediante archivo TXT: `--input`
+
+El lanzador incluye un **formato simple, propio de este repositorio**, para definir una antena en un archivo editable, como alternativa a escribir todos los parámetros en la consola. No se trata de un archivo `.nec` estándar, ni de una interfaz de MMANA-GAL.
+
+Guarda el siguiente texto como `dipolo.txt` (también disponible en [examples/dipole_ground.txt](examples/dipole_ground.txt)):
+
+```text
+# Dipolo horizontal de 10 m, z=6 m, sobre suelo de referencia
+FREQ 14.2
+WIRE 1 21 -5 0 6 5 0 6 0.001
+EXCITATION 10
+GROUND 13 0.005 0
+THETA 0 5 37
+PHI 0 5 73
+```
+
+Ejecuta en PowerShell desde el directorio del EXE:
+
+```powershell
+.\mininec.exe --input dipolo.txt > resultado.txt
+```
+
+También admite `--input=dipolo.txt` y rutas entre comillas, por ejemplo `--input "C:\Modelos HF\dipolo.txt"`. Las demás opciones de PyMININEC siguen funcionando como antes cuando **no** se usa `--input`. Por diseño, `--input` no se mezcla con opciones de simulación adicionales en la misma llamada; todos los parámetros deben constar en el archivo.
+
+| Instrucción | Sintaxis | Significado |
+|---|---|---|
+| `FREQ` | `FREQ 14.2` | Frecuencia en MHz, positiva |
+| `WIRE` | `WIRE tag nseg x1 y1 z1 x2 y2 z2 radio` | Hilo recto; repetible; coordenadas y radio en metros |
+| `EXCITATION` | `EXCITATION 10` | Número global del **pulso MININEC**, no segmento NEC |
+| `GROUND` | `GROUND 13 0.005 0` | Suelo con permitividad relativa, conductividad S/m, altura 0 |
+| `GROUND` | `GROUND 0 0 0` | Suelo perfecto |
+| `THETA` | `THETA 0 5 37` | Inicio, paso angular y puntos del barrido polar |
+| `PHI` | `PHI 0 5 73` | Inicio, paso angular y puntos del barrido azimutal |
+| `SWEEP` | `SWEEP 0.1 4` | Incremento de frecuencia (MHz) y cantidad de pasos/puntos según PyMININEC |
+
+Las líneas pueden incluir comentarios tras `#`. Las instrucciones no distinguen mayúsculas de minúsculas. Usa **punto** decimal, espacios entre los parámetros y radio (no diámetro) para `WIRE`. Debe existir exactamente un `FREQ` y un `EXCITATION`, y al menos un `WIRE`. Puedes agregar varios `WIRE` con tags diferentes. Para espacio libre, **omite** `GROUND`: la coordenada Z no representa entonces altura sobre un plano de tierra. Los errores de sintaxis se informan con número de línea y código de salida 2.
+
+Archivos de ejemplo: [dipolo en espacio libre](examples/dipole_free.txt), [dipolo con suelo real](examples/dipole_ground.txt), [barrido](examples/dipole_sweep.txt).
+
+**Limitaciones:** el formato deliberadamente no cubre todas las funciones de PyMININEC (por ejemplo, múltiples tipos de medio, radiales especiales, cargas o transformaciones); para ellas utiliza la interfaz original. La validez física de la alimentación por pulso se verifica mediante el motor, no por el parser. La salida sigue siendo texto, como la del motor original.
+
 ## 1. Descargar y ejecutar
 
 1. Abre [Actions](https://github.com/sergiozxp/mininec-windows/actions) y selecciona una ejecución exitosa de **Build MININEC for Windows**.
