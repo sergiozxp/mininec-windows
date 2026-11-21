@@ -1,12 +1,20 @@
-"""Simple non-interactive executable check."""
+"""Windows executable smoke tests for both CLI modes."""
+from pathlib import Path
+import re
 import subprocess
 import sys
 
-if __name__ == '__main__':
-    command = [sys.argv[1] if len(sys.argv) > 1 else 'mininec.exe', '--help']
-    r = subprocess.run(command, text=True, capture_output=True, timeout=120)
-    combined = (r.stdout + r.stderr).lower()
-    if r.returncode != 0 or not ('frequency' in combined and 'wire' in combined):
-        print('Smoke test failed', r.returncode, r.stdout[-2000:], r.stderr[-2000:])
-        sys.exit(1)
-    print('MININEC executable: CLI --help passed.')
+if __name__ == "__main__":
+    exe = sys.argv[1] if len(sys.argv) > 1 else "mininec.exe"
+    tests = [
+        ("help", [exe, "--help"], ("frequency", "wire")),
+        ("text input file", [exe, "--input", str(Path("examples") / "dipole_free.txt")],
+         ("impedance", "frequency")),
+    ]
+    for name, command, expected in tests:
+        r = subprocess.run(command, text=True, capture_output=True, timeout=180)
+        output = (r.stdout + r.stderr).lower()
+        if r.returncode != 0 or any(word not in output for word in expected):
+            print(name, "failed; exit code", r.returncode, r.stdout[-2000:], r.stderr[-2000:])
+            sys.exit(1)
+        print(name, "OK")
