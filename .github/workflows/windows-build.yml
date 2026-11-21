@@ -27,7 +27,7 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          python -m PyInstaller --clean --noconfirm --onefile --console --name mininec src/mininec_cli.py
+          python -m PyInstaller --clean --noconfirm --onefile --console --collect-all scipy --collect-all numpy --name mininec src/mininec_cli.py
       - name: Smoke test
         shell: pwsh
         run: |
