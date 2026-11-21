@@ -1,0 +1,40 @@
+name: Compare MININEC and NEC2
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'bench/**'
+      - '.github/workflows/engine-comparison.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install NEC2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nec2c
+          nec2c -h || true
+      - name: Install pinned MININEC
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "git+https://github.com/schlatterbeck/pymininec.git@3b0b3b836f0c785c30a6d78bf30028b8eff88c5b"
+          pymininec --help >/dev/null
+      - name: Run three cases with both engines
+        run: python bench/run_bench.py --mininec pymininec --nec2c nec2c --output bench/results --timeout 240
+      - name: Upload raw outputs and CSV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nec2-mininec-comparison
+          path: bench/results/
+          if-no-files-found: warn
