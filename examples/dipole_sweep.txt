@@ -1,0 +1,6 @@
+# Dipolo: barrido ilustrativo de 7.0 a 7.3 MHz
+FREQ 7.0
+SWEEP 0.1 4
+WIRE 1 21 -5 0 6 5 0 6 0.001
+EXCITATION 10
+GROUND 13 0.005 0
