@@ -1,0 +1,34 @@
+name: Benchmark checks
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'bench/**'
+      - 'tests/test_bench.py'
+      - '.github/workflows/bench-tests.yml'
+  pull_request:
+    paths:
+      - 'bench/**'
+      - 'tests/test_bench.py'
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline unit tests
+        run: python -m unittest discover -s tests -p 'test_bench.py' -v
+      - name: Generate three model decks
+        run: python bench/run_bench.py --generate-only
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validation-inputs
+          path: bench/results/
+          if-no-files-found: error
