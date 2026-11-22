@@ -4,6 +4,8 @@ Adds --input FILE with a small, explicit text format. The solver is untouched.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import math
 from pathlib import Path
 import sys
@@ -125,20 +127,56 @@ def translate_file(path: str | Path) -> list[str]:
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    output_dir = None
+    reference_ohm = 50.0
+    cleaned = []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--output":
+            if i + 1 >= len(argv): raise InputError("--output requires a directory")
+            output_dir = argv[i + 1]; i += 2; continue
+        if arg.startswith("--output="):
+            output_dir = arg.split("=", 1)[1]; i += 1; continue
+        if arg == "--reference-impedance":
+            if i + 1 >= len(argv): raise InputError("--reference-impedance requires ohms")
+            raw = argv[i + 1]; i += 2
+        elif arg.startswith("--reference-impedance="):
+            raw = arg.split("=", 1)[1]; i += 1
+        else:
+            cleaned.append(arg); i += 1; continue
+        try: reference_ohm = float(raw)
+        except ValueError as exc: raise InputError("reference impedance must be a number") from exc
+        if not math.isfinite(reference_ohm) or reference_ohm <= 0:
+            raise InputError("reference impedance must be positive")
+
+    argv = cleaned
     if argv and (argv[0] == "--input" or argv[0].startswith("--input=")):
         if argv[0] == "--input":
-            if len(argv) != 2:
-                raise InputError("usage: mininec.exe --input FILE (no additional options)")
+            if len(argv) != 2: raise InputError("usage: mininec.exe --input FILE")
             filename = argv[1]
         else:
             if len(argv) != 1 or not argv[0].split("=", 1)[1]:
-                raise InputError("usage: mininec.exe --input=FILE (no additional options)")
+                raise InputError("usage: mininec.exe --input=FILE")
             filename = argv[0].split("=", 1)[1]
         argv = translate_file(filename)
     elif any(arg == "--input" or arg.startswith("--input=") for arg in argv):
-        raise InputError("--input must be the first option and cannot be combined with other arguments")
+        raise InputError("--input must be the first model option")
+
     from mininec.mininec import main as upstream_main
-    return upstream_main(argv)
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        result = upstream_main(argv)
+    native = captured.getvalue()
+    sys.stdout.write(native)
+    if output_dir is not None:
+        from postprocess import parse_native, write_exports, PostprocessError
+        try:
+            metrics = parse_native(native, reference_ohm)
+            write_exports(output_dir, native, metrics)
+        except PostprocessError as exc:
+            raise InputError(f"cannot post-process native output: {exc}") from exc
+    return result
 
 
 if __name__ == "__main__":
