@@ -49,6 +49,7 @@ jobs:
           This executable was tested with a real dipole simulation in GitHub Actions.
           '@ | Set-Content release/INSTALL.txt
           Compress-Archive -Path release/* -DestinationPath mininec-windows-x64.zip -Force
+          Copy-Item dist/mininec.exe mininec.exe
           $h=(Get-FileHash mininec-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$h  mininec-windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
@@ -56,6 +57,7 @@ jobs:
           name: mininec-windows-release
           path: |
             mininec-windows-x64.zip
+            mininec.exe
             SHA256SUMS.txt
           if-no-files-found: error
       - name: Publish public GitHub Release (only after tests)
@@ -66,4 +68,4 @@ jobs:
           $tag='v1.0.0-windows'
           gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
           if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; refusing to replace public binary." }
-          gh release create $tag mininec-windows-x64.zip SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "MININEC Windows x64 v1.0.0" --notes "Unofficial PyMININEC Windows console executable. Includes a tested --input TXT launcher, sample antenna files, licenses and SHA-256. Build from pinned upstream revision; see README for scientific limitations."
+          gh release create $tag mininec-windows-x64.zip mininec.exe SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "MININEC Windows x64 v1.0.0" --notes "Unofficial PyMININEC Windows console executable. Includes a tested --input TXT launcher, sample antenna files, licenses and SHA-256. Build from pinned upstream revision; see README for scientific limitations."
