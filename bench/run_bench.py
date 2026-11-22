@@ -42,7 +42,7 @@ def mininec_command(exe, case, freq, density):
     g = CASES[case]["ground"]
     if g:
         a.append(f"--medium={g[0]},{g[1]},0")
-    a.append("--option=none")
+    a.extend(["--theta=0,5,19", "--phi=0,5,73"])
     return a
 
 def nec_text(case, freq, density):
@@ -59,7 +59,7 @@ def nec_text(case, freq, density):
     seg = (21*density+1)//2 if case != "vertical_radials" else 1
     lines.append(f"EX 0 1 {seg} 0 1 0")
     lines.append(f"FR 0 1 0 0 {freq} 0")
-    lines.extend(["XQ", "EN"])
+    lines.extend(["RP 0 19 73 1000 0 0 5 5 0 0", "EN"])
     return "\n".join(lines)+"\n"
 
 FLOAT = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][-+]?\d+)?"
