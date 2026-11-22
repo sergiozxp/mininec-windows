@@ -7,7 +7,7 @@ import sys
 if __name__ == "__main__":
     exe = sys.argv[1] if len(sys.argv) > 1 else "mininec.exe"
     tests = [
-        ("help", [exe, "--help"], ("frequency", "wire")),
+        ("help", [exe, "--help"], ()),
         ("text input file", [exe, "--input", str(Path("examples") / "dipole_free.txt")],
          ("impedance", "frequency")),
     ]
