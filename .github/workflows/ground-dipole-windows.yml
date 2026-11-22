@@ -1,0 +1,57 @@
+name: Validate published MININEC ground dipole
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'examples/dipole_ground.txt'
+      - '.github/workflows/ground-dipole-windows.yml'
+      - 'src/mininec_cli.py'
+      - 'requirements-build.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  ground-dipole:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install pinned build requirements
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+      - name: Build the Windows executable
+        shell: pwsh
+        run: |
+          python -m PyInstaller --clean --onefile --console --name mininec --hidden-import scipy._external.array_api_compat.numpy.fft src/mininec_cli.py
+          if (!(Test-Path dist/mininec.exe)) { throw 'Missing mininec.exe' }
+      - name: Run the 14.2 MHz real-ground dipole
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ground-results | Out-Null
+          & dist/mininec.exe --input examples/dipole_ground.txt *> ground-results/dipole_ground_output.txt
+          if ($LASTEXITCODE -ne 0) { throw "MININEC failed with exit code $LASTEXITCODE" }
+          $text = Get-Content -Raw ground-results/dipole_ground_output.txt
+          if ($text -notmatch '(?i)frequency') { throw 'Output does not contain frequency' }
+          if ($text -notmatch '(?i)impedance') { throw 'Output does not contain impedance' }
+          if ($text -notmatch '(?i)theta|pattern|radiation') { throw 'Output does not contain requested radiation-pattern data' }
+          @"
+          executable_sha256=$((Get-FileHash dist/mininec.exe -Algorithm SHA256).Hash.ToLowerInvariant())
+          input=examples/dipole_ground.txt
+          frequency_MHz=14.2
+          ground_epsilon_r=13
+          ground_conductivity_S_per_m=0.005
+          "@ | Set-Content ground-results/PROVENANCE.txt
+      - name: Publish raw ground-case results
+        uses: actions/upload-artifact@v4
+        with:
+          name: mininec-windows-ground-dipole-results
+          path: ground-results/
+          if-no-files-found: error
