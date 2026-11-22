@@ -248,3 +248,38 @@ El workflow usa una revisión fijada del proyecto original: `3b0b3b836f0c785c30a
 - **Documentación completa de las opciones:** [README original](https://github.com/schlatterbeck/pymininec/blob/master/README.rst).
 - **Esta distribución Windows:** proyecto comunitario de empaquetado, sin atribuirse autoría del motor.
 - Licencias y avisos: [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+
+## Postprocesador y exportación estructurada
+
+La versión `v1.1.0-windows` conserva el motor PyMININEC sin modificar sus ecuaciones y añade un postprocesador sobre su salida nativa. Se activa con:
+
+```powershell
+.\mininec.exe --input examples/dipole_ground.txt --output resultados
+```
+
+También puede cambiarse la impedancia de referencia, que por defecto es 50 ohmios:
+
+```powershell
+.\mininec.exe --input examples/dipole_ground.txt --output resultados --reference-impedance 75
+```
+
+El directorio de salida contiene:
+
+- `native_output.txt`: salida completa original de PyMININEC, sin alteraciones.
+- `summary.txt`: resumen legible.
+- `parameters.csv`: frecuencia, impedancia `R+jX`, coeficiente de reflexión complejo y magnitud, ROE, pérdida por desadaptación, ganancia máxima reportada y su dirección.
+- `pattern.csv`: puntos del patrón con cenit, azimut, componentes vertical/horizontal y total, en dBi.
+
+Magnitudes y convenciones:
+
+- Impedancia: `R+jX` en ohmios.
+- Coeficiente de reflexión: `Γ=(Z-Z0)/(Z+Z0)`, adimensional.
+- ROE: `(1+|Γ|)/(1-|Γ|)`, adimensional.
+- Pérdida por desadaptación: `-10 log10(1-|Γ|²)`, en dB.
+- Ganancia máxima: máximo de la columna `TOTAL PATTERN (DB)` proporcionada por PyMININEC, en dBi.
+- Dirección: ángulos `ZENITH` y `AZIMUTH` del punto donde aparece ese máximo, en grados.
+
+El postprocesador no calcula ganancia electromagnética adicional ni inventa valores: si la salida nativa no contiene impedancia o filas utilizables del patrón, el comando falla y no exporta un resumen incompleto. La ganancia y dirección dependen de la rejilla angular solicitada, segmentación, modelo de suelo y convenciones de PyMININEC; no constituyen por sí solas una validación experimental ni una comparación NEC2.
+
+El workflow [Build, test and publish MININEC Windows x64](.github/workflows/release-windows.yml) ejecuta automáticamente los casos de espacio libre y suelo real antes de crear la Release.
