@@ -74,25 +74,38 @@ def parse_mininec(s):
     return float(m.group(1)),float(m.group(2))
 
 def parse_nec(s):
-    """Parse first input impedance table of a nec2c *single frequency* output.
+    """Parse NEC2 ANTENNA INPUT PARAMETERS table for a single frequency.
 
-    Strictly expects the standard NEC-2 INPUT PARAMETERS table. Never silently
-    match an arbitrary pair of numbers.
+    Standard nec2c displays the IMPEDANCE column heading and the REAL /
+    IMAGINARY subheadings on separate lines. Restrict matching to the input
+    table to avoid confusing currents and impedance elsewhere in the output.
     """
-    lines=s.splitlines()
-    for i,line in enumerate(lines):
-        if "INPUT PARAMETERS" not in line.upper():
+    lines = s.splitlines()
+    for i, line in enumerate(lines):
+        if "ANTENNA INPUT PARAMETERS" not in line.upper():
             continue
-        for j in range(i+1,min(i+25,len(lines))):
-            hdr=lines[j].upper()
-            if "IMPEDANCE" in hdr and "REAL" in hdr and "IMAG" in hdr:
-                # Standard NEC-2: TAG SEG VOLT_REAL VOLT_IMAG CUR_REAL CUR_IMAG
-                # IMP_REAL IMP_IMAG ADMIT_REAL ADMIT_IMAG POWER
-                for line2 in lines[j+1:j+8]:
-                    vals=re.findall(FLOAT,line2)
-                    if len(vals)>=11 and re.match(r"^\s*\d+\s+\d+\s+",line2):
-                        return float(vals[6]),float(vals[7])
-    raise ValueError("NEC2 impedance table not recognized; inspect raw .out and extend parser")
+        table = lines[i + 1:i + 20]
+        header_index = next(
+            (j for j, line in enumerate(table)
+             if "IMPEDANCE" in line.upper() and "ADMITTANCE" in line.upper()),
+            None
+        )
+        if header_index is None:
+            continue
+        for line in table[header_index + 1:]:
+            fields = line.split()
+            # TAG, SEG, VOLT(2), CURRENT(2), IMPEDANCE(2),
+            # ADMITTANCE(2), POWER(1): exactly 11 numeric fields.
+            if len(fields) != 11:
+                continue
+            if not (fields[0].isdigit() and fields[1].isdigit()):
+                continue
+            try:
+                values = [float(v) for v in fields]
+            except ValueError:
+                continue
+            return values[6], values[7]
+    raise ValueError("NEC2 antenna input impedance table not recognized; inspect raw output")
 
 def run_command(command, stdout_file, timeout):
     done=subprocess.run(command,capture_output=True,text=True,timeout=timeout)
