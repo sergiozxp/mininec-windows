@@ -27,7 +27,7 @@ jobs:
       - name: Build self-contained console EXE
         shell: pwsh
         run: |
-          python -m PyInstaller --clean --onefile --console --name mininec src/mininec_cli.py
+          python -m PyInstaller --clean --onefile --console --name mininec --hidden-import scipy._external.array_api_compat.numpy.fft src/mininec_cli.py
           if (!(Test-Path dist/mininec.exe)) { throw 'Missing mininec.exe' }
       - name: Test real dipole simulation and CLI
         shell: pwsh
