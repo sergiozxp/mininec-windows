@@ -1,0 +1,97 @@
+name: Independent three-case MININEC NEC2 validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/independent-three-case.yml'
+      - 'bench/**'
+jobs:
+  compare:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download fixed public Windows executables
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force bin | Out-Null
+          Invoke-WebRequest 'https://github.com/sergiozxp/mininec-windows/releases/download/v1.1.0-windows/mininec.exe' -OutFile bin/mininec.exe
+          Invoke-WebRequest 'https://github.com/sergiozxp/nec2c-windows/releases/download/v1.3-win64/nec2c.exe' -OutFile bin/nec2c.exe
+          Get-FileHash bin/mininec.exe -Algorithm SHA256 | Out-File executable_hashes.txt
+          Get-FileHash bin/nec2c.exe -Algorithm SHA256 | Out-File executable_hashes.txt -Append
+          & bin/mininec.exe --help | Select-Object -First 8
+          & bin/nec2c.exe -h
+        continue-on-error: true
+      - name: Run three antenna cases - base mesh
+        id: base
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          python bench/run_bench.py --mininec bin/mininec.exe --nec2c bin/nec2c.exe --density 1 --output r1 | Tee-Object base_console.txt
+          if ($LASTEXITCODE -ne 0) { throw "Base mesh reported one or more failures" }
+      - name: Run three antenna cases - refined mesh
+        id: refined
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          python bench/run_bench.py --mininec bin/mininec.exe --nec2c bin/nec2c.exe --density 2 --output r2 | Tee-Object refined_console.txt
+          if ($LASTEXITCODE -ne 0) { throw "Refined mesh reported one or more failures" }
+      - name: Consolidate numerical evidence
+        shell: pwsh
+        run: |
+          @'
+          import csv, math, pathlib
+          root=pathlib.Path('.')
+          records=[]
+          for folder in ('r1','r2'):
+              p=root/folder/'summary.csv'
+              if not p.exists(): continue
+              with p.open(newline='',encoding='utf-8') as f:
+                  for r in csv.DictReader(f):
+                      r['mesh']=folder
+                      for prefix in ('mini','nec'):
+                          if r.get(prefix+'_R_ohm') and r.get(prefix+'_X_ohm'):
+                              z=complex(float(r[prefix+'_R_ohm']),float(r[prefix+'_X_ohm']))
+                              gamma=abs((z-50)/(z+50))
+                              r[prefix+'_SWR_50']=((1+gamma)/(1-gamma)) if gamma<1 else float('inf')
+                      records.append(r)
+          fields=['case','mesh','comparison_status','mini_R_ohm','mini_X_ohm','nec_R_ohm','nec_X_ohm','delta_R_ohm','delta_X_ohm','mini_SWR_50','nec_SWR_50','error']
+          with (root/'validation_summary.csv').open('w',newline='',encoding='utf-8') as f:
+              w=csv.DictWriter(f,fieldnames=fields,extrasaction='ignore');w.writeheader();w.writerows(records)
+          for r in records:
+              print(r['case'],r['mesh'],r['comparison_status'],r.get('mini_R_ohm',''),r.get('nec_R_ohm',''),r.get('error',''))
+          for c in set(x['case'] for x in records):
+              rr={x['mesh']:x for x in records if x['case']==c}
+              if 'r1' in rr and 'r2' in rr:
+                  for motor in ('mini','nec'):
+                      try:
+                          z1=complex(float(rr['r1'][motor+'_R_ohm']),float(rr['r1'][motor+'_X_ohm']))
+                          z2=complex(float(rr['r2'][motor+'_R_ohm']),float(rr['r2'][motor+'_X_ohm']))
+                          print('MESH_DELTA',c,motor,round(abs(z2-z1),4),'ohm')
+                      except (KeyError,ValueError): pass
+          '@ | Set-Content -Encoding UTF8 consolidate.py
+          python consolidate.py | Tee-Object validation_console.txt
+      - name: Upload all native outputs and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-three-case-validation
+          path: |
+            r1/
+            r2/
+            *console.txt
+            validation_summary.csv
+            executable_hashes.txt
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Mark incomplete comparisons unsuccessful
+        shell: pwsh
+        run: |
+          if ('${{ steps.base.outcome }}' -ne 'success' -or '${{ steps.refined.outcome }}' -ne 'success') {
+            throw 'At least one comparison failed; inspect uploaded raw outputs'
+          }
