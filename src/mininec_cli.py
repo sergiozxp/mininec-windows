@@ -9,6 +9,7 @@ import io
 import math
 from pathlib import Path
 import sys
+import time
 
 GRAMMAR = """Input file format (whitespace-separated, # for comments):
   FREQ MHz
@@ -122,6 +123,9 @@ def translate_file(path: str | Path) -> list[str]:
         raise InputError("missing EXCITATION")
     # Validate pulse numbering only with the numerical engine, which knows
     # junction pulse ownership and complex connected geometry.
+    if "SWEEP" in seen and not ({"THETA", "PHI"} & seen):
+        # Impedance-only sweeps need no far-field solve at every frequency.
+        commands.append("--option=none")
     return commands
 
 
@@ -129,10 +133,13 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     output_dir = None
     reference_ohm = 50.0
+    timings_requested = False
     cleaned = []
     i = 0
     while i < len(argv):
         arg = argv[i]
+        if arg == "--timings":
+            timings_requested = True; i += 1; continue
         if arg == "--output":
             if i + 1 >= len(argv): raise InputError("--output requires a directory")
             output_dir = argv[i + 1]; i += 2; continue
@@ -150,6 +157,9 @@ def main(argv=None):
         if not math.isfinite(reference_ohm) or reference_ohm <= 0:
             raise InputError("reference impedance must be positive")
 
+    if timings_requested and output_dir is None:
+        raise InputError("--timings requires --output directory")
+
     argv = cleaned
     if argv and (argv[0] == "--input" or argv[0].startswith("--input=")):
         if argv[0] == "--input":
@@ -163,17 +173,64 @@ def main(argv=None):
     elif any(arg == "--input" or arg.startswith("--input=") for arg in argv):
         raise InputError("--input must be the first model option")
 
-    from mininec.mininec import main as upstream_main
+    from mininec.mininec import main as upstream_main, Mininec as UpstreamMininec
+    compute_times = []
+    total_seconds = None
+    original_compute = UpstreamMininec.compute
+    if timings_requested:
+        def timed_compute(instance, *args, **kwargs):
+            start = time.perf_counter()
+            try:
+                return original_compute(instance, *args, **kwargs)
+            finally:
+                compute_times.append({
+                    "frequency_MHz": float(instance.f),
+                    "solver_seconds": time.perf_counter() - start,
+                })
+        # Wrap only the public per-frequency compute call; the PyMININEC method
+        # remains the original implementation and all numerical code is untouched.
+        UpstreamMininec.compute = timed_compute
     captured = io.StringIO()
-    with contextlib.redirect_stdout(captured):
-        result = upstream_main(argv)
+    total_start = time.perf_counter()
+    try:
+        with contextlib.redirect_stdout(captured):
+            result = upstream_main(argv)
+    finally:
+        total_seconds = time.perf_counter() - total_start
+        if timings_requested:
+            UpstreamMininec.compute = original_compute
     native = captured.getvalue()
     sys.stdout.write(native)
+    sweep_mode = any(
+        arg.startswith("--frequency-steps=") and int(arg.split("=", 1)[1]) > 1
+        for arg in argv
+    )
     if output_dir is not None:
-        from postprocess import parse_native, write_exports, PostprocessError
+        from postprocess import (
+            parse_native, write_exports, parse_sweep_native,
+            write_sweep_exports, write_timings_csv, PostprocessError
+        )
         try:
-            metrics = parse_native(native, reference_ohm)
-            write_exports(output_dir, native, metrics)
+            if sweep_mode:
+                sweep = parse_sweep_native(native)
+                if timings_requested and len(compute_times) != len(sweep):
+                    raise PostprocessError(
+                        f"timed {len(compute_times)} solver calls for {len(sweep)} frequency results"
+                    )
+                write_sweep_exports(
+                    output_dir, native, sweep,
+                    compute_times if timings_requested else None,
+                    total_seconds if timings_requested else None,
+                )
+            else:
+                metrics = parse_native(native, reference_ohm)
+                write_exports(output_dir, native, metrics)
+                if timings_requested:
+                    if len(compute_times) != 1:
+                        raise PostprocessError(
+                            f"expected one solver call, measured {len(compute_times)}"
+                        )
+                    write_timings_csv(output_dir, compute_times, total_seconds)
         except PostprocessError as exc:
             raise InputError(f"cannot post-process native output: {exc}") from exc
     return result
