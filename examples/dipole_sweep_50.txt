@@ -1,0 +1,5 @@
+# One PyMININEC process, 50 equally spaced frequencies from 3 to 30 MHz
+FREQ 3
+SWEEP 0.5510204081632653 50
+WIRE 1 21 -5 0 0 5 0 0 0.001
+EXCITATION 10

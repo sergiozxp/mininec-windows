@@ -39,6 +39,9 @@ jobs:
       - name: Test postprocessor on free-space and real-ground dipoles
         shell: pwsh
         run: python tests/validate_postprocess.py dist/mininec.exe
+      - name: Test 50-point single-process frequency sweep on packaged executable
+        shell: pwsh
+        run: python tests/test_sweep_exe.py dist/mininec.exe
       - name: Package and hash verified executable
         shell: pwsh
         run: |
@@ -57,8 +60,10 @@ jobs:
           '@ | Set-Content release/INSTALL.txt
           Compress-Archive -Path release/* -DestinationPath mininec-windows-x64.zip -Force
           Copy-Item dist/mininec.exe mininec.exe
-          $h=(Get-FileHash mininec-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$h  mininec-windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
+          $exeHash=(Get-FileHash mininec.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $zipHash=(Get-FileHash mininec-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$exeHash  mininec.exe" | Set-Content -Encoding ascii SHA256SUMS.txt
+          "$zipHash  mininec-windows-x64.zip" | Add-Content -Encoding ascii SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: mininec-windows-release
@@ -68,11 +73,12 @@ jobs:
             SHA256SUMS.txt
           if-no-files-found: error
       - name: Publish public GitHub Release (only after tests)
+        if: github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag='v1.1.0-windows'
+          $tag='v1.2.0-windows'
           gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
           if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; refusing to replace public binary." }
-          gh release create $tag mininec-windows-x64.zip mininec.exe SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "MININEC Windows x64 v1.1.0" --notes "Unofficial PyMININEC Windows console executable with native-output postprocessing. Includes impedance, reflection coefficient, configurable VSWR, mismatch loss, maximum reported gain/direction, TXT examples, licenses and SHA-256. All free-space and real-ground tests must pass before publication."
+          gh release create $tag mininec-windows-x64.zip mininec.exe SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "MININEC Windows x64 v1.2.0" --notes "Unofficial PyMININEC Windows x64 executable. Adds single-process frequency sweep from --input TXT with parameters.csv and optional per-frequency/total timings.csv. Original PyMININEC algorithms are unchanged. Includes examples, licenses and SHA-256 for EXE and ZIP."

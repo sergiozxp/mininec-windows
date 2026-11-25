@@ -80,3 +80,61 @@ def write_exports(output_dir, native_text, metrics):
            "Limitations: values depend on the PyMININEC model, segmentation, ground model and requested angular grid.",
            "Gain is the maximum total far-field pattern value reported by PyMININEC; it is not an independent measurement."]
     (out/"summary.txt").write_text("\n".join(lines)+"\n",encoding="utf-8")
+
+
+def parse_sweep_native(text: str):
+    """Extract one feed-point impedance for each native frequency result."""
+    frequencies = [float(m.group(1)) for m in FREQ_RE.finditer(text)]
+    impedances = [tuple(map(float, m.groups())) for m in IMPEDANCE_RE.finditer(text)]
+    if not frequencies:
+        raise PostprocessError("native output has no frequency records")
+    if len(frequencies) != len(impedances):
+        raise PostprocessError(
+            f"found {len(frequencies)} frequencies but {len(impedances)} feed impedances; "
+            "the sweep exporter requires one excitation source"
+        )
+    rows = []
+    for frequency, (resistance, reactance) in zip(frequencies, impedances):
+        _finite(frequency, "frequency")
+        _finite(resistance, "resistance")
+        _finite(reactance, "reactance")
+        rows.append({"frequency_MHz": frequency, "resistance_ohm": resistance,
+                     "reactance_ohm": reactance})
+    return rows
+
+
+def write_timings_csv(output_dir, timings, total_seconds):
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    with (out / "timings.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["frequency_MHz", "solver_seconds", "scope"])
+        for row in timings:
+            writer.writerow([format(row["frequency_MHz"], ".12g"),
+                             format(row["solver_seconds"], ".9f"),
+                             "per_frequency_compute"])
+        writer.writerow(["", format(total_seconds, ".9f"), "total_engine_call"])
+
+
+def write_sweep_exports(output_dir, native_text, rows, timings=None, total_seconds=None):
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "native_output.txt").write_text(native_text, encoding="utf-8")
+    with (out / "parameters.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["frequency_MHz", "resistance_ohm", "reactance_ohm"])
+        writer.writeheader()
+        writer.writerows(rows)
+    first, last = rows[0], rows[-1]
+    lines = ["MININEC frequency sweep", "",
+             "Native PyMININEC output is preserved in native_output.txt.",
+             f"Frequency points: {len(rows)}",
+             f"First frequency: {first['frequency_MHz']} MHz",
+             f"Last frequency: {last['frequency_MHz']} MHz",
+             "Solver algorithm: upstream PyMININEC; frequency loop performed in one process."]
+    if timings is not None:
+        if total_seconds is None or not math.isfinite(total_seconds):
+            raise PostprocessError("invalid total solver-call time")
+        write_timings_csv(output_dir, timings, total_seconds)
+        lines.extend([f"Total engine-call time: {total_seconds:.9f} s",
+                      "Per-frequency timings measure the upstream Mininec.compute call."])
+    (out / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -283,3 +283,19 @@ Magnitudes y convenciones:
 El postprocesador no calcula ganancia electromagnética adicional ni inventa valores: si la salida nativa no contiene impedancia o filas utilizables del patrón, el comando falla y no exporta un resumen incompleto. La ganancia y dirección dependen de la rejilla angular solicitada, segmentación, modelo de suelo y convenciones de PyMININEC; no constituyen por sí solas una validación experimental ni una comparación NEC2.
 
 El workflow [Build, test and publish MININEC Windows x64](.github/workflows/release-windows.yml) ejecuta automáticamente los casos de espacio libre y suelo real antes de crear la Release.
+## Barrido completo en un único proceso (v1.2.0)
+
+Un archivo TXT puede definir un barrido con `FREQ` y `SWEEP`. El lanzador llama una sola vez a PyMININEC; el motor conserva el mismo proceso y objeto del solver mientras calcula las frecuencias. No inicia Python por separado para cada punto. La opción `--timings` mide cada llamada de cálculo del motor y el tiempo total de la llamada al motor, sin alterar sus algoritmos.
+
+```powershell
+.\mininec.exe --input examples/dipole_sweep_50.txt --output resultados --timings
+```
+
+El ejemplo recorre 50 puntos equiespaciados de 3 a 30 MHz. En la carpeta de salida se crean:
+
+- `parameters.csv`: `frequency_MHz,resistance_ohm,reactance_ohm`.
+- `timings.csv`: duración de `Mininec.compute` por frecuencia y una fila `total_engine_call`.
+- `native_output.txt`: salida original completa de PyMININEC.
+- `summary.txt`: cantidad de frecuencias y extremos del barrido.
+
+La instrumentación de tiempos envuelve la llamada pública `compute` y restaura el método original al terminar. Para barridos sin `THETA` ni `PHI`, el lanzador solicita la opción nativa `none` para omitir el cálculo de patrones que no se exportan.
